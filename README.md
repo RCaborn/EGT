@@ -7,10 +7,11 @@ symbolically" rule — live in [`CLAUDE.md`](CLAUDE.md) and are binding.
 
 ## Status
 
-Deterministic replicator core **and** a finite-population (frequency-dependent
-Moran) model, both passing their verification gates (see below). Figures are
-generated with provenance sidecars. Stochastic *replicator* SDE (aggregate
-shocks / Euler–Maruyama) and spatial models are not implemented yet.
+Three solvers, each passing its verification gates (see below): the
+deterministic replicator ODE, the finite-population (frequency-dependent Moran)
+process, and the stochastic replicator with aggregate shocks (Fudenberg–Harris,
+log-score Euler–Maruyama). Figures are generated with provenance sidecars.
+Spatial models, fixation-time distributions, and real data are not in yet.
 
 ## Layout
 
@@ -19,15 +20,17 @@ src/egt/            # library code (the only dissertation-grade code)
   replicator.py     # deterministic replicator ODE, integrated with solve_ivp (RK45)
   games.py          # canonical payoff matrices (Hawk-Dove, RPS, Prisoner's Dilemma)
   moran.py          # frequency-dependent Moran process (finite population), seeded
+  stochastic.py     # stochastic replicator (aggregate shocks), log-score Euler-Maruyama
   plotting.py       # headless figure builders (return matplotlib Figures)
   provenance.py     # save_figure() + provenance sidecar (script, seed, commit)
 scripts/            # regenerable entry points
   make_verification_figures.py
 tests/              # pytest suite
-  test_verification.py   # the canonical verification gates (replicator + Moran)
+  test_verification.py   # the canonical verification gates (replicator + Moran + SDE)
   test_replicator.py     # RHS algebra, mass conservation, input validation
   test_games.py          # payoff-matrix constructors
   test_moran.py          # fitness algebra, reproducibility, validation
+  test_stochastic.py     # drift order, reproducibility, small-noise mean, validation
   test_provenance.py     # sidecar contents, figure builders run
 notebooks/          # exploratory only — nothing here is dissertation-grade
 figures/            # vector (PDF/SVG) figures tracked; quick PNGs git-ignored
@@ -68,6 +71,13 @@ et al. 2004 — so permitted by `CLAUDE.md`):
 6. **Constant selection** — `ρ = (1 − 1/r)/(1 − 1/rᴺ)`; seeded Monte Carlo agrees.
 7. **Replicator link** — birth-death drift sign matches the replicator velocity.
 8. **The 1/3 law** — a mutant is favoured (`ρ > 1/N`) iff the unstable `x* < 1/3`.
+
+Stochastic replicator (aggregate shocks; Fudenberg–Harris 1992, Imhof 2005):
+
+9. **Neutral game → exact Gaussian** — `log(x₀/x₁)` is `N(−(σ₀²−σ₁²)T/2, (σ₀²+σ₁²)T)`
+   (specifically tests the `−σᵢ²/2` Itô correction).
+10. **Zero-noise limit** — `σ = 0` reproduces the deterministic replicator.
+11. **Simplex invariance under noise** — `Σ x = 1` to 1e-10 and `xᵢ > 0` throughout.
 
 ## Setup & running the tests
 

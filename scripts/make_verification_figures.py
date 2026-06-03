@@ -28,6 +28,7 @@ from egt.plotting import (  # noqa: E402
     moran_fixation_figure,
     prisoners_dilemma_fixation_figure,
     rps_orbits_figure,
+    stochastic_replicator_figure,
 )
 from egt.provenance import save_figure  # noqa: E402
 
@@ -80,6 +81,14 @@ def main() -> None:
             {"N": 20,
              "r_points": [0.6, 0.8, 1.0, 1.25, 1.6, 2.0],
              "n_runs": 50_000, "seed": 20240603},
+            20240603,
+        ),
+        (
+            "stochastic_replicator",
+            stochastic_replicator_figure,
+            {"V": 2.0, "C": 5.0, "sigma": 0.25, "T": 30.0, "dt": 0.01,
+             "n_paths": 2000, "n_paths_shown": 12,
+             "sigma_neutral": [0.7, 0.4], "seed": 20240603},
             20240603,
         ),
     ]

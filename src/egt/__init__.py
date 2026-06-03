@@ -14,12 +14,16 @@ from egt.moran import (
     simulate_fixation,
 )
 from egt.replicator import average_payoff, replicator_rhs, simulate
+from egt.stochastic import SdeResult, simulate_replicator_sde
 
 __all__ = [
     # replicator (deterministic)
     "average_payoff",
     "replicator_rhs",
     "simulate",
+    # stochastic replicator (aggregate shocks)
+    "simulate_replicator_sde",
+    "SdeResult",
     # games
     "hawk_dove",
     "rock_paper_scissors",

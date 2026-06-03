@@ -22,6 +22,7 @@ from egt.moran import (
     fixation_probability_constant_selection,
 )
 from egt.replicator import simulate
+from egt.stochastic import simulate_replicator_sde
 
 # --- ternary (3-strategy simplex) projection ------------------------------- #
 # Corners: strategy 0 -> (0, 0), strategy 1 -> (1, 0), strategy 2 -> top.
@@ -217,5 +218,76 @@ def moran_fixation_figure(
     ax.set_ylabel(r"fixation probability $\rho$")
     ax.set_title(f"Moran process fixation, $N={N}$")
     ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+# --- Stochastic replicator (aggregate shocks) ------------------------------- #
+def stochastic_replicator_figure(
+    V: float = 2.0,
+    C: float = 5.0,
+    sigma: float = 0.25,
+    T: float = 30.0,
+    dt: float = 0.01,
+    n_paths: int = 2000,
+    n_paths_shown: int = 12,
+    sigma_neutral: Sequence[float] = (0.7, 0.4),
+    seed: int = 20240603,
+) -> Figure:
+    """Two panels for the Fudenberg-Harris stochastic replicator.
+
+    Left: Hawk-Dove Hawk-share sample paths under noise, the ensemble mean, and
+    the deterministic trajectory, all relative to ``x* = V/C``.
+
+    Right: for the neutral game (``A = 0``) the log-odds ``log(x0/x1)`` are exactly
+    Gaussian; the simulated histogram is overlaid with the predicted density
+    ``N(-(s0^2 - s1^2)T/2, (s0^2 + s1^2)T)`` -- a visual check of the Ito term.
+    """
+    seeds = np.random.SeedSequence(seed).spawn(2)
+
+    fig = Figure(figsize=(9.0, 4.2))
+
+    # Left: Hawk-Dove sample paths.
+    A = hawk_dove(V, C)
+    x_star = V / C
+    x0 = np.array([0.85, 0.15])
+    res = simulate_replicator_sde(A, x0, sigma, (0.0, T), dt,
+                                  seed=np.random.default_rng(seeds[0]), n_paths=n_paths)
+    ax0 = fig.add_subplot(1, 2, 1)
+    for k in range(min(n_paths_shown, n_paths)):
+        ax0.plot(res.t, res.X[k, 0], color="0.7", lw=0.5, alpha=0.7)
+    ax0.plot(res.t, res.X.mean(axis=0)[0], color="C3", lw=1.6, label="ensemble mean")
+    ode = simulate(A, x0, (0.0, T), t_eval=res.t).y[0]
+    ax0.plot(res.t, ode, color="C0", lw=1.4, ls="--", label="deterministic")
+    ax0.axhline(x_star, color="k", lw=0.8, ls=":", label=f"$x^*=V/C={x_star:g}$")
+    ax0.set_xlabel("time")
+    ax0.set_ylabel("Hawk share $x_H$")
+    ax0.set_ylim(0.0, 1.0)
+    ax0.set_title(rf"Hawk-Dove with noise ($\sigma={sigma:g}$)")
+    ax0.legend(loc="best", fontsize=8)
+
+    # Right: neutral-game logit distribution vs exact Gaussian.
+    s0, s1 = float(sigma_neutral[0]), float(sigma_neutral[1])
+    res_n = simulate_replicator_sde(np.zeros((2, 2)), np.array([0.5, 0.5]),
+                                    np.array([s0, s1]), (0.0, T), dt,
+                                    seed=np.random.default_rng(seeds[1]),
+                                    n_paths=n_paths, keep_full=False)
+    u = np.log(res_n.final[:, 0] / res_n.final[:, 1])
+    mu = -0.5 * (s0**2 - s1**2) * T
+    var = (s0**2 + s1**2) * T
+    grid = np.linspace(u.min(), u.max(), 300)
+    pdf = np.exp(-((grid - mu) ** 2) / (2.0 * var)) / np.sqrt(2.0 * np.pi * var)
+
+    ax1 = fig.add_subplot(1, 2, 2)
+    ax1.hist(u, bins=60, density=True, color="0.8", edgecolor="none",
+             label="simulated")
+    ax1.plot(grid, pdf, color="C3", lw=1.6,
+             label=r"exact $\mathcal{N}(\mu,\sigma^2)$")
+    ax1.axvline(mu, color="k", lw=0.8, ls=":")
+    ax1.set_xlabel(r"log-odds $\log(x_0/x_1)$ at $t=T$")
+    ax1.set_ylabel("density")
+    ax1.set_title(rf"Neutral game ($\sigma=({s0:g},{s1:g})$)")
+    ax1.legend(loc="best", fontsize=8)
+
     fig.tight_layout()
     return fig

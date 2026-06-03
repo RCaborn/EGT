@@ -21,6 +21,7 @@ from egt.moran import (
     fixation_probability_constant_selection,
 )
 from egt.replicator import replicator_rhs, simulate
+from egt.stochastic import simulate_replicator_sde
 
 # Integrator tolerances used throughout the gates (explicit, never defaulted).
 RTOL = 1e-10
@@ -188,3 +189,56 @@ def test_moran_one_third_law(a: float, b: float, c: float, d: float) -> None:
     assert (rho > 1.0 / N) == (x_star < 1.0 / 3.0), (
         f"x*={x_star:.3f}, rho={rho:.3e}, 1/N={1.0 / N:.3e}"
     )
+
+
+# =========================================================================== #
+# Verification gates for the stochastic replicator (egt.stochastic).           #
+# Fudenberg & Harris (1992); Imhof (2005). Log-score Euler-Maruyama.           #
+# =========================================================================== #
+
+# --- SDE gate 1: neutral game gives an EXACT Gaussian logit. ----------------- #
+# With A = 0 the log scores are constant-coefficient SDEs, so the scheme is
+# exact and u = log(x0/x1) ~ N(u0 - (s0^2 - s1^2) T / 2, (s0^2 + s1^2) T). The
+# predicted mean depends on the -sigma^2/2 Ito correction, so this gate fails
+# loudly if that term is wrong (a wrong correction shifts the mean by ~90 SE).
+def test_sde_neutral_game_gaussian_logit() -> None:
+    A = np.zeros((2, 2))
+    s0, s1 = 0.7, 0.4
+    sigma = np.array([s0, s1])
+    x0 = np.array([0.5, 0.5])
+    T, dt, n_paths = 1.0, 0.005, 40_000
+    res = simulate_replicator_sde(A, x0, sigma, (0.0, T), dt,
+                                  seed=1, n_paths=n_paths, keep_full=False)
+    u = np.log(res.final[:, 0] / res.final[:, 1])
+
+    mean_pred = 0.0 - 0.5 * (s0**2 - s1**2) * T
+    var_pred = (s0**2 + s1**2) * T
+    se_mean = np.sqrt(var_pred / n_paths)
+    assert abs(u.mean() - mean_pred) < 4.0 * se_mean, (
+        f"mean {u.mean():.4f} vs predicted {mean_pred:.4f} (Ito term?)"
+    )
+    assert abs(u.var() / var_pred - 1.0) < 0.05, (
+        f"variance ratio {u.var() / var_pred:.4f}"
+    )
+
+
+# --- SDE gate 2: zero-noise limit reproduces the deterministic replicator. --- #
+def test_sde_zero_noise_matches_deterministic() -> None:
+    A = hawk_dove(2.0, 5.0)
+    x0 = np.array([0.8, 0.2])
+    T = 20.0
+    sde = simulate_replicator_sde(A, x0, 0.0, (0.0, T), dt=0.005, seed=0, n_paths=1)
+    ode = simulate(A, x0, (0.0, T), rtol=RTOL, atol=ATOL)
+    assert abs(sde.final[0, 0] - ode.y[0, -1]) < 1e-4, (
+        f"sde={sde.final[0, 0]}, ode={ode.y[0, -1]}"
+    )
+
+
+# --- SDE gate 3: simplex invariance and positivity under noise. -------------- #
+def test_sde_simplex_invariance_under_noise() -> None:
+    A = hawk_dove(2.0, 5.0)
+    res = simulate_replicator_sde(A, np.array([0.5, 0.5]), np.array([0.5, 0.3]),
+                                  (0.0, 30.0), dt=0.01, seed=7, n_paths=300)
+    sums = res.X.sum(axis=1)  # (n_paths, n_steps+1)
+    assert np.max(np.abs(sums - 1.0)) < 1e-10, "Sum x left the simplex under noise"
+    assert res.X.min() > 0.0, "a component became non-positive under noise"
