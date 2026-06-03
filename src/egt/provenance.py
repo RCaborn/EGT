@@ -22,8 +22,19 @@ from matplotlib.figure import Figure
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _git_commit(repo_root: Path = _REPO_ROOT) -> tuple[str, bool]:
-    """Return ``(commit_hash, is_dirty)`` for the repo, ('unknown', False) if not a repo."""
+def _git_commit(
+    repo_root: Path = _REPO_ROOT,
+    exclude_dir: Optional[str] = None,
+) -> tuple[str, bool]:
+    """Return ``(commit_hash, is_dirty)`` for the repo, ('unknown', False) if not a repo.
+
+    ``is_dirty`` reflects uncommitted modifications to *tracked source* only:
+    untracked files are ignored (the figure being written is itself untracked at
+    generation time), and ``exclude_dir`` (the figure's own output directory) is
+    excluded so that regenerating sibling figures does not flag the provenance as
+    dirty. A dirty flag therefore means the code that produced the figure had
+    uncommitted changes.
+    """
     try:
         commit = (
             subprocess.check_output(
@@ -34,16 +45,12 @@ def _git_commit(repo_root: Path = _REPO_ROOT) -> tuple[str, bool]:
         )
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         return ("unknown", False)
+    cmd = ["git", "status", "--porcelain", "--untracked-files=no"]
+    if exclude_dir:
+        cmd += ["--", f":(exclude){exclude_dir}"]
     try:
-        # Ignore untracked files: the figure being written is itself untracked
-        # at generation time, so only *tracked* source modifications should
-        # flag the provenance as dirty.
         dirty = bool(
-            subprocess.check_output(
-                ["git", "status", "--porcelain", "--untracked-files=no"],
-                cwd=repo_root,
-                stderr=subprocess.DEVNULL,
-            )
+            subprocess.check_output(cmd, cwd=repo_root, stderr=subprocess.DEVNULL)
             .decode()
             .strip()
         )
@@ -70,9 +77,14 @@ def figure_metadata(
     seed: Optional[int] = None,
     params: Optional[Mapping[str, Any]] = None,
     caption: Optional[str] = None,
+    exclude_dir: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Build the provenance record written alongside a figure."""
-    commit, dirty = _git_commit()
+    """Build the provenance record written alongside a figure.
+
+    ``exclude_dir`` is a repo-relative directory excluded from the dirty check
+    (typically the figure's own output directory); see :func:`_git_commit`.
+    """
+    commit, dirty = _git_commit(exclude_dir=exclude_dir)
     meta: dict[str, Any] = {
         "figure": figure_name,
         "script": script,
@@ -129,7 +141,18 @@ def save_figure(
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    meta = figure_metadata(path.name, script, seed=seed, params=params, caption=caption)
+    # Exclude the figure's own output directory from the dirty check so that
+    # regenerating a batch of figures does not mark later ones dirty.
+    try:
+        exclude_dir: Optional[str] = str(path.parent.resolve().relative_to(_REPO_ROOT))
+        if exclude_dir == ".":
+            exclude_dir = None
+    except ValueError:
+        exclude_dir = None  # output lives outside the repo (e.g. /tmp QA)
+
+    meta = figure_metadata(
+        path.name, script, seed=seed, params=params, caption=caption, exclude_dir=exclude_dir
+    )
 
     if stamp:
         commit = meta["git_commit"]
