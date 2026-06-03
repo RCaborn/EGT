@@ -1,20 +1,21 @@
 {
-  "created_utc": "2026-06-03T17:46:56.146487+00:00",
-  "figure": "moran_fixation.pdf",
+  "created_utc": "2026-06-03T17:46:59.740124+00:00",
+  "figure": "stochastic_replicator.pdf",
   "git_commit": "a9eed308a6857f9f61f47c4b05ab30e3415bded3",
   "git_dirty": false,
   "params": {
-    "N": 20,
-    "n_runs": 50000,
-    "r_points": [
-      0.6,
-      0.8,
-      1.0,
-      1.25,
-      1.6,
-      2.0
-    ],
-    "seed": 20240603
+    "C": 5.0,
+    "T": 30.0,
+    "V": 2.0,
+    "dt": 0.01,
+    "n_paths": 2000,
+    "n_paths_shown": 12,
+    "seed": 20240603,
+    "sigma": 0.25,
+    "sigma_neutral": [
+      0.7,
+      0.4
+    ]
   },
   "script": "scripts/make_verification_figures.py",
   "seed": 20240603,
