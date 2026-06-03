@@ -1,0 +1,6 @@
+# Exact pins for bit-for-bit reproducibility (CLAUDE.md: Reproducibility).
+# Resolved against Python 3.11. Re-pin deliberately, never float.
+numpy==2.4.6
+scipy==1.17.1
+matplotlib==3.10.9
+pytest==9.0.3
