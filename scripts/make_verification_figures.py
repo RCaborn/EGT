@@ -25,6 +25,7 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from egt.plotting import (  # noqa: E402
     hawk_dove_convergence_figure,
+    moran_fixation_figure,
     prisoners_dilemma_fixation_figure,
     rps_orbits_figure,
 )
@@ -43,6 +44,8 @@ def main() -> None:
     outdir: Path = args.outdir
     ext: str = args.ext
 
+    # (name, builder, params, seed). seed is None for deterministic (ODE) figures
+    # and an explicit integer for the stochastic (Monte-Carlo) figure.
     builders = [
         (
             "hawk_dove_convergence",
@@ -50,6 +53,7 @@ def main() -> None:
             {"V": 2.0, "C": 5.0,
              "initial_hawk_shares": [0.05, 0.25, 0.5, 0.75, 0.95],
              "T": 20.0, "rtol": 1e-10, "atol": 1e-12},
+            None,
         ),
         (
             "rps_orbits",
@@ -60,6 +64,7 @@ def main() -> None:
                                     [0.50, 0.25, 0.25]],
              "orbit_T": 50.0, "conservation_T": 300.0,
              "rtol": 1e-10, "atol": 1e-12},
+            None,
         ),
         (
             "prisoners_dilemma_fixation",
@@ -67,13 +72,22 @@ def main() -> None:
             {"T_payoff": 5.0, "R": 3.0, "P": 1.0, "S": 0.0,
              "initial_coop_shares": [0.1, 0.3, 0.5, 0.7, 0.9],
              "T": 15.0, "rtol": 1e-10, "atol": 1e-12},
+            None,
+        ),
+        (
+            "moran_fixation",
+            moran_fixation_figure,
+            {"N": 20,
+             "r_points": [0.6, 0.8, 1.0, 1.25, 1.6, 2.0],
+             "n_runs": 50_000, "seed": 20240603},
+            20240603,
         ),
     ]
 
-    for name, builder, params in builders:
+    for name, builder, params, seed in builders:
         fig = builder(**params)
         path = outdir / f"{name}.{ext}"
-        sidecar = save_figure(fig, path, script=_SCRIPT, seed=None, params=params)
+        sidecar = save_figure(fig, path, script=_SCRIPT, seed=seed, params=params)
         print(f"wrote {path}  (+ {sidecar.name})")
 
 

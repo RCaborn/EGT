@@ -14,7 +14,13 @@ import numpy as np
 import pytest
 
 from egt.games import hawk_dove, prisoners_dilemma, rock_paper_scissors
-from egt.replicator import simulate
+from egt.moran import (
+    estimate_fixation_probability,
+    fitnesses,
+    fixation_probability,
+    fixation_probability_constant_selection,
+)
+from egt.replicator import replicator_rhs, simulate
 
 # Integrator tolerances used throughout the gates (explicit, never defaulted).
 RTOL = 1e-10
@@ -110,3 +116,75 @@ def test_simplex_invariance(A: np.ndarray, x0: list[float], T: float) -> None:
     # A dip of ~1e-12 at a fixation boundary is atol-scale roundoff, not the
     # trajectory leaving the simplex; anything below -1e-11 would be.
     assert x.min() >= -1e-11, f"a component drifted negative: {x.min():.2e}"
+
+
+# =========================================================================== #
+# Verification gates for the finite-population Moran process (egt.moran).      #
+# These are the closed-form results CLAUDE.md permits because they are         #
+# textbook (Nowak 2006; Nowak, Sasaki, Taylor & Fudenberg 2004).               #
+# =========================================================================== #
+
+# --- Moran gate 1: neutral fixation probability is exactly 1/N. ------------- #
+@pytest.mark.parametrize("N", [2, 5, 10, 50, 100])
+def test_moran_neutral_fixation_is_one_over_N(N: int) -> None:
+    M = np.array([[1.0, 1.0], [1.0, 1.0]])  # payoffs irrelevant when w = 0
+    rho = fixation_probability(N, M, w=0.0)
+    assert abs(rho - 1.0 / N) < 1e-12, f"neutral rho={rho}, expected {1.0 / N}"
+
+
+# --- Moran gate 2: constant selection matches (1-1/r)/(1-1/r^N). ------------ #
+@pytest.mark.parametrize("N, r", [(10, 1.1), (20, 1.5), (50, 0.8), (100, 2.0)])
+def test_moran_constant_selection_closed_form(N: int, r: float) -> None:
+    # M00=M01=r, M10=M11=1 with w=1 gives strategy-0 fitness r against fitness 1.
+    M = np.array([[r, r], [1.0, 1.0]])
+    rho_chain = fixation_probability(N, M, w=1.0)
+    rho_closed = fixation_probability_constant_selection(r, N)
+    assert abs(rho_chain - rho_closed) < 1e-12, (
+        f"chain={rho_chain}, closed-form={rho_closed}"
+    )
+
+
+def test_moran_monte_carlo_matches_closed_form() -> None:
+    # Seeded Monte Carlo agrees with the exact fixation probability.
+    N, r = 20, 1.5
+    M = np.array([[r, r], [1.0, 1.0]])
+    rho = fixation_probability_constant_selection(r, N)
+    p_hat, se = estimate_fixation_probability(N, M, 1.0, n_runs=200_000, seed=12345)
+    assert abs(p_hat - rho) < 4.0 * se, f"MC {p_hat:.5f}+/-{se:.5f} vs exact {rho:.5f}"
+
+
+# --- Moran gate 3: drift sign matches the (verified) replicator velocity. --- #
+def test_moran_drift_sign_matches_replicator() -> None:
+    # Strategy 0 strictly dominates (a>c and b>d): the birth-death drift must
+    # point the same way as the deterministic replicator at every interior state.
+    N = 50
+    M = np.array([[4.0, 3.0], [2.0, 1.0]])
+    F0, F1 = fitnesses(N, M, w=0.5)
+    for k, i in enumerate(range(1, N)):
+        drift_sign = np.sign(F0[k] - F1[k])
+        x = np.array([i / N, 1.0 - i / N])
+        repl_sign = np.sign(replicator_rhs(0.0, x, M)[0])
+        assert drift_sign == repl_sign, f"sign mismatch at i={i}"
+
+
+# --- Moran gate 4: the 1/3 law (Nowak, Sasaki, Taylor & Fudenberg 2004). ---- #
+# In a coordination game with unstable interior equilibrium x*, under weak
+# selection and large N a single strategy-0 mutant is favoured (rho > 1/N) iff
+# x* < 1/3. Tested with cases comfortably either side of the threshold.
+@pytest.mark.parametrize(
+    "a, b, c, d",
+    [
+        (7.0, 1.0, 1.0, 2.0),  # x* = 1/7  < 1/3  -> favoured
+        (8.0, 1.0, 1.0, 2.0),  # x* = 1/8  < 1/3  -> favoured
+        (3.0, 1.0, 1.0, 5.0),  # x* = 2/3  > 1/3  -> disfavoured
+        (2.0, 1.0, 1.0, 4.0),  # x* = 3/4  > 1/3  -> disfavoured
+    ],
+)
+def test_moran_one_third_law(a: float, b: float, c: float, d: float) -> None:
+    N, w = 500, 0.005  # large N, weak selection
+    M = np.array([[a, b], [c, d]])
+    x_star = (d - b) / ((a - c) + (d - b))  # unstable interior equilibrium (share of 0)
+    rho = fixation_probability(N, M, w)
+    assert (rho > 1.0 / N) == (x_star < 1.0 / 3.0), (
+        f"x*={x_star:.3f}, rho={rho:.3e}, 1/N={1.0 / N:.3e}"
+    )

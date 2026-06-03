@@ -17,6 +17,10 @@ import numpy as np
 from matplotlib.figure import Figure
 
 from egt.games import hawk_dove, prisoners_dilemma, rock_paper_scissors
+from egt.moran import (
+    estimate_fixation_probability,
+    fixation_probability_constant_selection,
+)
 from egt.replicator import simulate
 
 # --- ternary (3-strategy simplex) projection ------------------------------- #
@@ -165,6 +169,53 @@ def prisoners_dilemma_fixation_figure(
     ax.set_xlabel("time")
     ax.set_ylabel("Cooperator share $x_C$ (log)")
     ax.set_title(f"Prisoner's Dilemma: defection fixates ($T,R,P,S={T_payoff:g},{R:g},{P:g},{S:g}$)")
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+# --- Moran process: fixation probability, closed form vs Monte Carlo -------- #
+def moran_fixation_figure(
+    N: int = 20,
+    r_curve: Optional[np.ndarray] = None,
+    r_points: Sequence[float] = (0.6, 0.8, 1.0, 1.25, 1.6, 2.0),
+    n_runs: int = 50_000,
+    seed: int = 20240603,
+) -> Figure:
+    """Moran fixation probability vs relative fitness r at population size N.
+
+    The closed-form ``(1 - 1/r)/(1 - 1/r^N)`` (Nowak 2006) is drawn as a curve;
+    seeded Monte-Carlo estimates with binomial error bars are overlaid. The
+    neutral value ``1/N`` is marked. Each Monte-Carlo point uses an independent
+    sub-stream derived from ``seed`` so the figure is reproducible.
+    """
+    if r_curve is None:
+        r_curve = np.linspace(0.5, 2.0, 200)
+
+    rho_curve = np.array([fixation_probability_constant_selection(float(r), N) for r in r_curve])
+
+    seed_seq = np.random.SeedSequence(seed)
+    child_seeds = seed_seq.spawn(len(r_points))
+    p_hat = np.empty(len(r_points))
+    p_err = np.empty(len(r_points))
+    for k, r in enumerate(r_points):
+        M = np.array([[r, r], [1.0, 1.0]])
+        rng = np.random.default_rng(child_seeds[k])
+        p_hat[k], p_err[k] = estimate_fixation_probability(
+            N, M, 1.0, n_runs=n_runs, seed=rng
+        )
+
+    fig = Figure(figsize=(6.0, 4.0))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(r_curve, rho_curve, color="C0", lw=1.5,
+            label=r"closed form $(1-1/r)/(1-1/r^N)$")
+    ax.errorbar(r_points, p_hat, yerr=p_err, fmt="o", color="C3", ms=4,
+                capsize=2, lw=1.0, label=f"Monte Carlo ($n={n_runs:,}$)")
+    ax.axhline(1.0 / N, ls=":", color="0.5", lw=1.0, label=f"neutral $1/N={1.0/N:g}$")
+    ax.axvline(1.0, ls=":", color="0.5", lw=0.8)
+    ax.set_xlabel("relative fitness $r$")
+    ax.set_ylabel(r"fixation probability $\rho$")
+    ax.set_title(f"Moran process fixation, $N={N}$")
     ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
     return fig
