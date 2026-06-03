@@ -1,0 +1,28 @@
+{
+  "created_utc": "2026-06-03T17:19:31.748075+00:00",
+  "figure": "hawk_dove_convergence.pdf",
+  "git_commit": "92805ce714ebddf49c19d7b6949256a1c8904050",
+  "git_dirty": false,
+  "params": {
+    "C": 5.0,
+    "T": 20.0,
+    "V": 2.0,
+    "atol": 1e-12,
+    "initial_hawk_shares": [
+      0.05,
+      0.25,
+      0.5,
+      0.75,
+      0.95
+    ],
+    "rtol": 1e-10
+  },
+  "script": "scripts/make_verification_figures.py",
+  "seed": null,
+  "versions": {
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6",
+    "python": "3.11.15",
+    "scipy": "1.17.1"
+  }
+}
