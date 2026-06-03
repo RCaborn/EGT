@@ -1,24 +1,23 @@
 {
-  "created_utc": "2026-06-03T17:27:48.443362+00:00",
-  "figure": "hawk_dove_convergence.pdf",
+  "created_utc": "2026-06-03T17:27:53.322209+00:00",
+  "figure": "moran_fixation.pdf",
   "git_commit": "755f62fea75ddb5c772beb44428d1d1765be7eee",
   "git_dirty": false,
   "params": {
-    "C": 5.0,
-    "T": 20.0,
-    "V": 2.0,
-    "atol": 1e-12,
-    "initial_hawk_shares": [
-      0.05,
-      0.25,
-      0.5,
-      0.75,
-      0.95
+    "N": 20,
+    "n_runs": 50000,
+    "r_points": [
+      0.6,
+      0.8,
+      1.0,
+      1.25,
+      1.6,
+      2.0
     ],
-    "rtol": 1e-10
+    "seed": 20240603
   },
   "script": "scripts/make_verification_figures.py",
-  "seed": null,
+  "seed": 20240603,
   "versions": {
     "matplotlib": "3.10.9",
     "numpy": "2.4.6",

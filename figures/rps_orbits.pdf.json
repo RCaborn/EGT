@@ -1,7 +1,7 @@
 {
-  "created_utc": "2026-06-03T17:19:32.634601+00:00",
+  "created_utc": "2026-06-03T17:27:49.329377+00:00",
   "figure": "rps_orbits.pdf",
-  "git_commit": "92805ce714ebddf49c19d7b6949256a1c8904050",
+  "git_commit": "755f62fea75ddb5c772beb44428d1d1765be7eee",
   "git_dirty": false,
   "params": {
     "a": 1.0,
